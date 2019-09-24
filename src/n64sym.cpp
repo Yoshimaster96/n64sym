@@ -19,13 +19,18 @@ CN64Sym::CN64Sym(FILE* pfile) :
 	m_LibPaths(NULL),
 	m_bVerbose(false)
 {
-	fseek(pfile, 0, SEEK_END);
-	
-	m_DataSize = ftell(pfile);
+	//Only dump the second .text section, as it's usually the one that has the most code
+	//(at least for the few games I looked at)
+	fseek(pfile, 4, SEEK_SET);
+	int offset = (getc(pfile)<<24)|(getc(pfile)<<16)|(getc(pfile)<<8)|getc(pfile);
+	fseek(pfile, 0x4C, SEEK_SET);
+	m_DataOffset = (getc(pfile)<<24)|(getc(pfile)<<16)|(getc(pfile)<<8)|getc(pfile);
+	fseek(pfile, 0x94, SEEK_SET);
+	m_DataSize = (getc(pfile)<<24)|(getc(pfile)<<16)|(getc(pfile)<<8)|getc(pfile);
+	fseek(pfile,offset,SEEK_SET);
 	m_Data = (uint8_t*) malloc(m_DataSize);
-
-	rewind(pfile);
 	fread(m_Data, 1, m_DataSize, pfile);
+	fclose(pfile);
 	
 	m_Results = new search_results_t;
 	m_LibPaths = new str_vector_t;
@@ -85,11 +90,6 @@ bool CN64Sym::ResultCmp(search_result_t a, search_result_t b)
 	return (a.address < b.address);
 }
 
-bool CN64Sym::ResultCmp2(search_result_t a, search_result_t b)
-{
-	return (a.address < b.address);
-}
-
 void CN64Sym::SortResults()
 {
 	std::sort(m_Results->begin(), m_Results->end(), ResultCmp);
@@ -134,7 +134,7 @@ void CN64Sym::AddSymbolResults(CElfContext* elf, uint32_t baseAddress, int maxTe
 
 			search_result_t result;
 			//result.file_address = 0;
-			result.address = 0x80000000 | (baseAddress + symbol->Value());
+			result.address = m_DataOffset + (baseAddress + symbol->Value());
 			result.size = symbol->Size();
 			strcpy(result.name, symbol->Name(elf));
 
@@ -166,12 +166,18 @@ void CN64Sym::AddRelocationResults(CElfContext* elf, const char* block, const ch
 			continue;
 		}
 		
-		if(relType == R_MIPS_26 && (opcode >> 26) == 0x0C)
+		if(((opcode&1)==1)&&((opcode>>26)==0x12)&&
+		((relType==R_PPC_ADDR24)&&((opcode&2)==2))|
+		((relType==R_PPC_REL24)&&((opcode&2)==0)))
 		{
-			uint32_t jalTarget = 0x80000000 | ((opcode & 0x3FFFFFF) * 4);
+			uint32_t blTarget = (opcode & 0x3FFFFFC);
+			if(relType==R_PPC_REL24)
+			{
+				blTarget += textOffset;
+			}
 			
 			search_result_t result;
-			result.address = jalTarget;
+			result.address = blTarget|0x80000000;
 			result.size = 0;
 			strncpy(result.name, symbol->Name(elf), 64);
 
@@ -192,21 +198,6 @@ void CN64Sym::AddRelocationResults(CElfContext* elf, const char* block, const ch
 			Log("adding %s (relocation)\n", result.name);
 
 			AddResult(result);
-		}
-		else if(relType == R_MIPS_LO16 && i > 0)
-		{
-			CElfRelocation* prevRelocation = elf->TextRelocation(i - 1);
-
-			if(prevRelocation->Type() == R_MIPS_HI16)
-			{
-				uint32_t upperOp = bswap32(*(uint32_t*)&block[prevRelocation->Offset()]);
-				uint32_t lowerOp = opcode;
-
-				// TODO: Implement
-
-				CElfSymbol* symbol = relocation->Symbol(elf);
-				Log("%04X%04X,data,%s\n", upperOp & 0xFFFF, lowerOp & 0xFFFF, symbol->Name(elf));
-			}
 		}
 	}
 }
@@ -344,8 +335,6 @@ void CN64Sym::ProcessObject(obj_processing_context_t* objProcessingCtx)
 		}
 	}
 
-	threadPool.LockDefaultMutex();
-
 	Log("%s:%s\n", objProcessingCtx->libraryPath, objProcessingCtx->blockIdentifier);
 
 	if(bHaveFullMatch)
@@ -363,7 +352,6 @@ void CN64Sym::ProcessObject(obj_processing_context_t* objProcessingCtx)
 	}
 	else
 	{
-		threadPool.UnlockDefaultMutex();
 		return;
 	}
 
@@ -387,12 +375,11 @@ void CN64Sym::ProcessObject(obj_processing_context_t* objProcessingCtx)
 			}
 		}
 
-		Log("%08X/%04X: %08X %08X", 0x80000000 | (matchedAddress + i), i, buffOp, textOp);
+		Log("%08X/%04X: %08X %08X", m_DataOffset + (matchedAddress + i), i, buffOp, textOp);
 		textOp == buffOp ? Log("\n") : Log(" * %s\n", bHaveRel ? symbol->Name(&elf) : "");
 	}
 
 	Log("\n");
-	threadPool.UnlockDefaultMutex();
 }
 
 void CN64Sym::ProcessObject(const char* path)
@@ -452,11 +439,8 @@ void CN64Sym::ProcessLibrary(const char* path)
 		objProcessingCtx->blockIdentifier = ar.GetBlockIdentifier();
 		objProcessingCtx->blockData = ar.GetBlockData();
 		objProcessingCtx->blockSize = ar.GetBlockSize();
-
-		threadPool.AddWorker(ProcessObjectProc, (void*)objProcessingCtx);
+		ProcessObjectProc((void*)objProcessingCtx);
 	}
-
-	threadPool.WaitForWorkers();
 }
 
 // returns true if 'str' ends with 'suffix'

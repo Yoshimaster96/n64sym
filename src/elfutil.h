@@ -57,17 +57,9 @@
 #define ELFCLASS64   2 // 64-bit objects
 
 // mips relocation types
-#define R_MIPS_NONE     0
-#define R_MIPS_16       1
-#define R_MIPS_32       2
-#define R_MIPS_REL32    3
-#define R_MIPS_26       4
-#define R_MIPS_HI16     5
-#define R_MIPS_LO16     6
-#define R_MIPS_GPREL16  7
-#define R_MIPS_LITERAL  8
-#define R_MIPS_GOT16    9
-#define R_MIPS_CALL16  21
+#define R_PPC_NONE	0
+#define R_PPC_ADDR24	2
+#define R_PPC_REL24	10
 
 // special section numbers
 #define SHN_UNDEF 0

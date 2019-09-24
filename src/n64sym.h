@@ -17,7 +17,6 @@ License: MIT
 
 #include "arutil.h"
 #include "elfutil.h"
-#include "threadpool.h"
 
 class CN64Sym
 {
@@ -43,11 +42,10 @@ class CN64Sym
 		int nBytesMatched;
 	} partial_match_t;
 
-	CThreadPool threadPool;
-
 	typedef std::vector<search_result_t> search_results_t;
 	typedef std::vector<const char*> str_vector_t;
 
+	uint32_t m_DataOffset;
 	uint8_t* m_Data;
 	size_t m_DataSize;
 	search_results_t* m_Results;
@@ -64,7 +62,6 @@ private:
 	static bool IsFileWithSymbols(const char *path);
 
 	static bool ResultCmp(search_result_t a, search_result_t b);
-	static bool ResultCmp2(search_result_t a, search_result_t b);
 
 	CN64Sym(FILE* pfile);
 	
