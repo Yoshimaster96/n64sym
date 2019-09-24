@@ -52,18 +52,10 @@ const char* mips_rel_typename(int rel_type)
 {
     switch(rel_type)
     {
-        case R_MIPS_16   : return    "R_MIPS_16";
-        case R_MIPS_32      : return "R_MIPS_32";
-        case R_MIPS_REL32   : return "R_MIPS_REL32";
-        case R_MIPS_26      : return "R_MIPS_26";
-        case R_MIPS_HI16    : return "R_MIPS_HI16";
-        case R_MIPS_LO16    : return "R_MIPS_LO16";
-        case R_MIPS_GPREL16 : return "R_MIPS_GPREL16";
-        case R_MIPS_LITERAL : return "R_MIPS_LITERAL";
-        case R_MIPS_GOT16   : return "R_MIPS_GOT16";
-        case R_MIPS_CALL16  : return "R_MIPS_CALL16";
+        case R_PPC_ADDR24   : return    "R_PPC_ADDR24";
+        case R_PPC_REL24      : return "R_PPC_REL24";
         default:
-        case R_MIPS_NONE: return "R_MIPS_NONE";
+        case R_PPC_NONE: return "R_PPC_NONE";
     }
 }
 
