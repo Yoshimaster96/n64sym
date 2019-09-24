@@ -14,3 +14,6 @@ Eg:
 ```
 n64sym paper_mario.bin -l libs/libgultra_rom.a
 ```
+
+Yoshimaster96 Edit
+Modified for use with GameCube DOL files
